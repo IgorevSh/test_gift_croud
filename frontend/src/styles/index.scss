@@ -1,0 +1,103 @@
+@use 'variables' as *;
+
+:root {
+  --color-primary: #{$primary};
+  --color-secondary: #{$secondary};
+  --color-accent: #{$accent};
+  --bg-primary: #{$bg-primary};
+  --bg-gradient-end: #e8eaf2;
+  --bg-radial-center: rgba(255, 255, 255, 0.2);
+  --bg-card: #{$bg-card};
+  --text-primary: #{$text-primary};
+  --text-secondary: #{$text-secondary};
+  --radius: #{$radius};
+  --shadow: #{$shadow};
+}
+
+[data-theme='dark'] {
+  --color-primary: #{$primary-dark};
+  --color-secondary: #{$secondary-dark};
+  --color-accent: #{$accent-dark};
+  --bg-primary: #{$bg-primary-dark};
+  --bg-gradient-end: #22262e;
+  --bg-radial-center: rgba(255, 255, 255, 0.05);
+  --bg-card: #{$bg-card-dark};
+  --text-primary: #{$text-primary-dark};
+  --text-secondary: #{$text-secondary-dark};
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  background:
+    radial-gradient(ellipse 100% 80% at 50% 50%, var(--bg-radial-center) 0%, transparent 60%),
+    linear-gradient(160deg, var(--bg-primary) 0%, var(--bg-gradient-end) 100%);
+  background-attachment: fixed;
+  color: var(--text-primary);
+  transition: background var(--transition), color var(--transition);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration: none;
+  transition: opacity var(--transition);
+  &:hover {
+    opacity: 0.85;
+  }
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  transition: opacity var(--transition), transform 0.15s ease;
+  &:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+input,
+textarea {
+  font: inherit;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.app {
+  min-height: 100vh;
+  padding: 1rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.app:has(.auth-page) {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 640px) {
+  .app {
+    padding: 0.75rem;
+  }
+}
