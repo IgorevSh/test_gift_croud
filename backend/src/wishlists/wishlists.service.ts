@@ -8,6 +8,11 @@ import { Reservation } from '../database/models/reservation.model';
 import { Contribution } from '../database/models/contribution.model';
 import { EventsGateway } from '../events/events.gateway';
 
+const EVENT_ITEMS = 'items';
+const EVENT_WISHLIST = 'wishlist';
+const EVENT_RESERVATION = 'reservation';
+const EVENT_CONTRIBUTION = 'contribution';
+
 @Injectable()
 export class WishlistsService {
   constructor(
@@ -72,9 +77,9 @@ export class WishlistsService {
           include: [
             {
               model: Reservation,
-              as: 'reservation',
+              as: 'reservations',
               required: false,
-              include: [{ model: User, attributes: ['displayName'], required: false }],
+              include: [{ model: User, as: 'user', attributes: ['displayName'], required: false }],
             },
             {
               model: Contribution,
@@ -88,7 +93,6 @@ export class WishlistsService {
     });
   }
 
-  /** For owner: items with isReserved + contributedTotal only. For guest: items with reservation/contributions + isCurrentUser for reservation. */
   async getPublicViewByToken(token: string, isOwner: boolean, currentUserId?: string | null): Promise<Wishlist | null> {
     const w = await this.findByShareToken(token);
     if (!w) return null;
@@ -96,19 +100,21 @@ export class WishlistsService {
     const ownerDisplayName = plain.owner?.displayName ?? 'Автор';
     delete plain.owner;
     plain.ownerDisplayName = ownerDisplayName;
-    plain.items = (plain.items || []).map((item: any) => {
-      const { reservation, contributions, ...rest } = item;
+    plain.items = (plain.items ?? []).map((item: any) => {
+      const { reservations, contributions, ...rest } = item;
+      const reservationsList = reservations ?? [];
+      const isReserved = reservationsList.length > 0;
       if (isOwner) {
         return {
           ...rest,
-          isReserved: !!reservation,
-          contributedTotal: (contributions || []).reduce(
+          isReserved,
+          contributedTotal: (contributions ?? []).reduce(
             (s: number, c: any) => s + parseFloat(c.amount || 0),
             0,
           ),
         };
       }
-      const contribList = (contributions || []).map((c: any) => ({
+      const contribList = (contributions ?? []).map((c: any) => ({
         id: c.id,
         amount: c.amount,
         userId: c.userId ?? c.user_id,
@@ -117,19 +123,18 @@ export class WishlistsService {
       const myContrib =
         currentUserId &&
         contribList.find((c: any) => String(c.userId) === String(currentUserId));
+      const reservationsMapped = reservationsList.map((r: any) => ({
+        id: r.id,
+        isCurrentUser:
+          !!currentUserId &&
+          (String(r.userId ?? r.user_id) === String(currentUserId)),
+        displayName: r.user?.displayName ?? 'Участник',
+      }));
       return {
         ...rest,
-        isReserved: !!reservation,
-        reservation: reservation
-          ? {
-              id: reservation.id,
-              isCurrentUser:
-                !!currentUserId &&
-                (String((reservation as any).userId ?? (reservation as any).user_id) === String(currentUserId)),
-              displayName: (reservation as any).user?.displayName ?? (reservation as any).User?.displayName ?? 'Участник',
-            }
-          : null,
-        contributedTotal: (contributions || []).reduce(
+        isReserved,
+        reservations: reservationsMapped,
+        contributedTotal: (contributions ?? []).reduce(
           (s: number, c: any) => s + parseFloat(c.amount || 0),
           0,
         ),
@@ -143,7 +148,7 @@ export class WishlistsService {
   async update(id: string, ownerId: string, data: { title?: string; description?: string }): Promise<Wishlist> {
     const w = await this.findOne(id, ownerId);
     await w.update(data);
-    this.eventsGateway.emitWishlistUpdate(w.shareToken, { type: 'wishlist' });
+    this.eventsGateway.emitWishlistUpdate(w.shareToken, { type: EVENT_WISHLIST });
     return w;
   }
 
@@ -178,7 +183,7 @@ export class WishlistsService {
       imageUrl: data.imageUrl ?? null,
       sortOrder: (maxOrder ?? 0) + 1,
     });
-    this.eventsGateway.emitWishlistUpdate(w.shareToken, { type: 'items' });
+    this.eventsGateway.emitWishlistUpdate(w.shareToken, { type: EVENT_ITEMS });
     return item;
   }
 
@@ -196,11 +201,15 @@ export class WishlistsService {
     }>,
   ): Promise<WishlistItem> {
     const item = await this.itemModel.findByPk(itemId, {
-      include: [{ model: Wishlist, as: 'wishlist' }],
+      include: [
+        { model: Wishlist, as: 'wishlist' },
+        { model: Contribution, as: 'contributions', required: false },
+      ],
     });
     if (!item || (item as any).wishlist?.ownerId !== ownerId) {
       throw new NotFoundException('Item not found');
     }
+    const wishlist = (item as any).wishlist as Wishlist;
     const updateData: Record<string, unknown> = { ...data };
     if (updateData.link === '') updateData.link = null;
     if (updateData.imageUrl === '') updateData.imageUrl = null;
@@ -208,9 +217,36 @@ export class WishlistsService {
       updateData.price = null;
       updateData.currency = null;
     }
+
+    const oldTargetNum = parseFloat(String((item as any).targetAmount ?? (item as any).price ?? '0')) || 0;
+    const oldHasTarget = oldTargetNum > 0;
+    const newPrice = updateData.price !== undefined ? updateData.price : (item as any).price;
+    const newTargetAmount = updateData.targetAmount !== undefined ? updateData.targetAmount : (item as any).targetAmount;
+    const newTargetNum = parseFloat(String(newTargetAmount ?? newPrice ?? '0')) || 0;
+    const newHasTarget = newTargetNum > 0;
+
+    if (oldHasTarget && !newHasTarget) {
+      const contributions = (item as any).contributions ?? [];
+      await this.contributionModel.destroy({ where: { wishlistItemId: itemId } });
+      if (contributions.length > 0) {
+        for (const c of contributions) {
+          const userId = (c as any).userId ?? (c as any).user_id;
+          if (!userId) continue;
+          await this.reservationModel.create({
+            wishlistItemId: itemId,
+            userId,
+            note: null,
+          });
+        }
+      }
+    }
+
+    if (!oldHasTarget && newHasTarget) {
+      await this.reservationModel.destroy({ where: { wishlistItemId: itemId } });
+    }
+
     await item.update(updateData as any);
-    const wishlist = (item as any).wishlist as Wishlist;
-    this.eventsGateway.emitWishlistUpdate(wishlist.shareToken, { type: 'items' });
+    this.eventsGateway.emitWishlistUpdate(wishlist.shareToken, { type: EVENT_ITEMS });
     return item;
   }
 
@@ -223,45 +259,47 @@ export class WishlistsService {
     }
     const wishlist = (item as any).wishlist as Wishlist;
     await item.destroy();
-    this.eventsGateway.emitWishlistUpdate(wishlist.shareToken, { type: 'items' });
+    this.eventsGateway.emitWishlistUpdate(wishlist.shareToken, { type: EVENT_ITEMS });
   }
 
   async reserve(itemId: string, userId: string, note?: string): Promise<Reservation> {
     const item = await this.itemModel.findByPk(itemId, {
-      include: [{ model: Wishlist, as: 'wishlist' }, { model: Reservation, as: 'reservation' }],
+      include: [{ model: Wishlist, as: 'wishlist' }, { model: Reservation, as: 'reservations' }],
     });
     if (!item) throw new NotFoundException('Item not found');
     const wishlist = (item as any).wishlist as Wishlist;
     if (wishlist.ownerId === userId) throw new BadRequestException('Owner cannot reserve');
-    const existing = (item as any).reservation;
-    if (existing) throw new BadRequestException('Already reserved');
+    const reservations = (item as any).reservations ?? [];
+    const alreadyReservedByMe = reservations.some(
+      (r: any) => String(r.userId ?? r.user_id) === String(userId),
+    );
+    if (alreadyReservedByMe) throw new BadRequestException('Already reserved by you');
     const reservation = await this.reservationModel.create({
       wishlistItemId: itemId,
       userId,
       note: note ?? null,
     });
     this.eventsGateway.emitWishlistUpdate(wishlist.shareToken, {
-      type: 'reservation',
+      type: EVENT_RESERVATION,
       data: { wishlistItemId: itemId },
     });
     return reservation;
   }
 
   async cancelReservation(itemId: string, userId: string): Promise<void> {
-    const item = await this.itemModel.findByPk(itemId, {
-      include: [{ model: Wishlist, as: 'wishlist' }, { model: Reservation, as: 'reservation' }],
+    const mine = await this.reservationModel.findOne({
+      where: { wishlistItemId: itemId, userId },
+      include: [{ model: WishlistItem, as: 'wishlistItem', include: [{ model: Wishlist, as: 'wishlist' }] }],
     });
-    if (!item) throw new NotFoundException('Item not found');
-    const existing = (item as any).reservation as Reservation | undefined;
-    if (!existing || existing.userId !== userId) {
-      throw new BadRequestException('Reservation not found or you are not the reserver');
+    if (!mine) throw new BadRequestException('Reservation not found or you are not the reserver');
+    const wishlist = (mine as any).wishlistItem?.wishlist as Wishlist;
+    await mine.destroy();
+    if (wishlist) {
+      this.eventsGateway.emitWishlistUpdate(wishlist.shareToken, {
+        type: EVENT_RESERVATION,
+        data: { wishlistItemId: itemId },
+      });
     }
-    await existing.destroy();
-    const wishlist = (item as any).wishlist as Wishlist;
-    this.eventsGateway.emitWishlistUpdate(wishlist.shareToken, {
-      type: 'reservation',
-      data: { wishlistItemId: itemId },
-    });
   }
 
   async contribute(itemId: string, userId: string, amount: string): Promise<Contribution> {
@@ -301,7 +339,7 @@ export class WishlistsService {
       });
     }
     this.eventsGateway.emitWishlistUpdate(wishlist.shareToken, {
-      type: 'contribution',
+      type: EVENT_CONTRIBUTION,
       data: { wishlistItemId: itemId },
     });
     return contribution;
@@ -323,7 +361,7 @@ export class WishlistsService {
     });
     if (deleted) {
       this.eventsGateway.emitWishlistUpdate(wishlist.shareToken, {
-        type: 'contribution',
+        type: EVENT_CONTRIBUTION,
         data: { wishlistItemId: itemId },
       });
     }

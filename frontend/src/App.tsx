@@ -6,13 +6,13 @@ import type { AuthUser } from './api/auth';
 import api from './api/client';
 import Layout from './components/Layout';
 import Login from './pages/Login';
-import Register from './pages/Register.tsx';
-import Dashboard from './pages/Dashboard.tsx';
-import WishlistEdit from './pages/WishlistEdit.tsx';
-import PublicWishlist from './pages/PublicWishlist.tsx';
+import Register from './pages/Register';
+import Dashboard from './pages/Dashboard';
+import WishlistEdit from './pages/WishlistEdit';
+import PublicWishlist from './pages/PublicWishlist';
 
 function App() {
-  const { token, loaded } = useAppSelector((s) => s.auth);
+  const { loaded } = useAppSelector((s) => s.auth);
   const dispatch = useAppDispatch();
 
   useEffect(() => {
@@ -22,17 +22,13 @@ function App() {
   }, [dispatch]);
 
   useEffect(() => {
-    if (!token) {
-      dispatch(setUserFromStorage(null));
-      return;
-    }
     if (loaded) return;
     api
       .get('/auth/me')
       .then((r) => r.data)
       .then((user: AuthUser) => dispatch(setUserFromStorage(user)))
       .catch(() => dispatch(setUserFromStorage(null)));
-  }, [token, loaded, dispatch]);
+  }, [loaded, dispatch]);
 
   return (
     <div className="app">

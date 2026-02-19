@@ -1,11 +1,10 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store';
 import { fetchPublicWishlist, setWishlist, clearPublicWishlist } from '../store/slices/publicWishlistSlice';
-import { publicWishlistApi } from '../api/wishlists';
-import { wishlistsApi } from '../api/wishlists';
-import { io } from 'socket.io-client';
+import { publicWishlistApi, wishlistsApi } from '../api/wishlists';
 import type { WishlistItemDto } from '../api/wishlists';
+import { io } from 'socket.io-client';
 import './PublicWishlist.scss';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
@@ -16,7 +15,6 @@ export default function PublicWishlist() {
   const { wishlist, found, isOwner, loading, error } = useAppSelector((s) => s.publicWishlist);
   const hasAuth = !!useAppSelector((s) => s.auth.token);
   const currentUserId = useAppSelector((s) => s.auth.user?.id) ?? null;
-  const socketRef = useRef<ReturnType<typeof io> | null>(null);
 
   useEffect(() => {
     if (!token || !hasAuth) return;
@@ -30,7 +28,6 @@ export default function PublicWishlist() {
   useEffect(() => {
     if (!token || !hasAuth) return;
     const socket = io(SOCKET_URL, { path: '/socket.io', transports: ['websocket', 'polling'] });
-    socketRef.current = socket;
     socket.emit('joinWishlist', { shareToken: token });
     socket.on('wishlistUpdate', () => {
       publicWishlistApi.getByToken(token!).then((r) => {
@@ -40,7 +37,6 @@ export default function PublicWishlist() {
     return () => {
       socket.off('wishlistUpdate');
       socket.disconnect();
-      socketRef.current = null;
     };
   }, [token, hasAuth, dispatch]);
 
@@ -128,7 +124,6 @@ export default function PublicWishlist() {
                   isOwner={isOwner}
                   isGuest={isGuest}
                   currentUserId={currentUserId}
-                  shareToken={token}
                   onUpdate={() => {
                     if (token) {
                       publicWishlistApi.getByToken(token).then((r) => {
@@ -157,7 +152,6 @@ function PublicItemCard({
   isOwner: boolean;
   isGuest: boolean;
   currentUserId: string | null;
-  shareToken: string;
   onUpdate: () => void;
 }) {
   const [reserving, setReserving] = useState(false);
@@ -167,7 +161,9 @@ function PublicItemCard({
   const [showJoinForm, setShowJoinForm] = useState(false);
   const [error, setError] = useState('');
 
-  const isReserved = item.isReserved ?? !!item.reservation;
+  const reservations = item.reservations ?? [];
+  const isReserved = item.isReserved ?? reservations.length > 0;
+  const myReservation = reservations.find((r) => r.isCurrentUser);
   const targetNum = parseFloat(item.targetAmount || item.price || '0') || 0;
   const contributed = item.contributedTotal ?? 0;
   const currencySym = item.currency === 'USD' ? '$' : '₽';
@@ -189,8 +185,8 @@ function PublicItemCard({
     try {
       await wishlistsApi.reserve(item.id);
       onUpdate();
-    } catch (e: any) {
-      setError(e.response?.data?.message || 'Не удалось зарезервировать');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Не удалось зарезервировать');
     } finally {
       setReserving(false);
     }
@@ -202,8 +198,8 @@ function PublicItemCard({
     try {
       await wishlistsApi.cancelReservation(item.id);
       onUpdate();
-    } catch (e: any) {
-      setError(e.response?.data?.message || 'Не удалось отменить резервацию');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Не удалось отменить резервацию');
     } finally {
       setCancellingReservation(false);
     }
@@ -229,8 +225,8 @@ function PublicItemCard({
       setContributeAmount('');
       setShowJoinForm(false);
       onUpdate();
-    } catch (e: any) {
-      setError(e.response?.data?.message || 'Не удалось внести вклад');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Не удалось внести вклад');
     } finally {
       setContributing(false);
     }
@@ -244,8 +240,8 @@ function PublicItemCard({
       await wishlistsApi.removeContribution(item.id);
       setShowJoinForm(false);
       onUpdate();
-    } catch (e: any) {
-      setError(e.response?.data?.message || 'Не удалось отказаться');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Не удалось отказаться');
     } finally {
       setContributing(false);
     }
@@ -306,11 +302,13 @@ function PublicItemCard({
           </>
         )}
 
-        {!hasTarget && isReserved && item.reservation && (
+        {!hasTarget && isReserved && reservations.length > 0 && (
           <div className="public-card__participants">
             <span className="public-card__participants-title">Участники:</span>
             <ul className="public-card__participants-list">
-              <li>{item.reservation.displayName ?? 'Участник'}</li>
+              {reservations.map((r) => (
+                <li key={r.id}>{r.displayName ?? 'Участник'}</li>
+              ))}
             </ul>
           </div>
         )}
@@ -332,7 +330,7 @@ function PublicItemCard({
                 {isReserved && (
                   <div className="public-card__reserved-row">
                     <span className="public-card__reserved">Зарезервировано</span>
-                    {item.reservation?.isCurrentUser && (
+                    {myReservation && (
                       <button
                         type="button"
                         className="public-card__btn public-card__btn--cancel-reserve"

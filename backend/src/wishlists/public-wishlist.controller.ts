@@ -8,21 +8,16 @@ import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt.guard';
 export class PublicWishlistController {
   constructor(private wishlistsService: WishlistsService) {}
 
-  /**
-   * Public link: GET /w/:token
-   * No auth required. If Authorization header present and valid, isOwner is set so owner sees anonymized view.
-   */
   @Get(':token')
   @UseGuards(OptionalJwtAuthGuard)
   async getByToken(
     @Param('token') token: string,
     @Req() req: Request & { user?: User },
   ) {
-    const user = req.user as User | undefined;
-    const currentUserId = user?.id ?? null;
+    const currentUserId = req.user?.id ?? null;
     const wishlist = await this.wishlistsService.findByShareToken(token);
     if (!wishlist) return { found: false };
-    const isOwner = currentUserId === (wishlist as any).ownerId;
+    const isOwner = currentUserId === wishlist.ownerId;
     const view = await this.wishlistsService.getPublicViewByToken(token, isOwner, currentUserId);
     return { found: true, isOwner, wishlist: view };
   }

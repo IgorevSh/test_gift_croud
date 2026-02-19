@@ -7,31 +7,29 @@ interface AuthState {
   loaded: boolean;
 }
 
-const token = localStorage.getItem('token');
 const initialState: AuthState = {
   user: null,
-  token,
-  loaded: !token,
+  token: null,
+  loaded: false,
 };
 
 const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    setAuth: (state, action: { payload: { user: AuthUser; token: string } }) => {
+    setAuth: (state, action: { payload: { user: AuthUser } }) => {
       state.user = action.payload.user;
-      state.token = action.payload.token;
+      state.token = 'cookie';
       state.loaded = true;
-      localStorage.setItem('token', action.payload.token);
     },
     logout: (state) => {
       state.user = null;
       state.token = null;
       state.loaded = true;
-      localStorage.removeItem('token');
     },
     setUserFromStorage: (state, action: { payload: AuthUser | null }) => {
       state.user = action.payload;
+      state.token = action.payload ? 'cookie' : null;
       state.loaded = true;
     },
   },

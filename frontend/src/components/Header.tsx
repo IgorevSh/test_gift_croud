@@ -2,12 +2,20 @@ import { Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store';
 import { logout } from '../store/slices/authSlice';
 import { toggleTheme } from '../store/slices/themeSlice';
+import api from '../api/client';
 import './Header.scss';
 
 export default function Header() {
   const { user } = useAppSelector((s) => s.auth);
   const theme = useAppSelector((s) => s.theme);
   const dispatch = useAppDispatch();
+
+  const handleLogout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch (_err) {}
+    dispatch(logout());
+  };
 
   return (
     <header className="header">
@@ -34,7 +42,7 @@ export default function Header() {
         >
           {theme === 'light' ? '🌙' : '☀️'}
         </button>
-        <button type="button" className="header__logout" onClick={() => dispatch(logout())}>
+        <button type="button" className="header__logout" onClick={handleLogout}>
           Выйти
         </button>
       </div>

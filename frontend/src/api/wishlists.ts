@@ -22,9 +22,8 @@ export interface WishlistItemDto {
   sortOrder: number;
   isReserved?: boolean;
   contributedTotal?: number;
-  reservation?: { id: string; isCurrentUser?: boolean; displayName?: string } | null;
+  reservations?: { id: string; isCurrentUser?: boolean; displayName?: string }[];
   contributions?: ContributionDto[];
-  /** Вклад текущего пользователя (приходит с бэкенда при авторизованном запросе) */
   myContribution?: { id: string; amount: string } | null;
 }
 
@@ -35,7 +34,6 @@ export interface WishlistDto {
   description: string | null;
   shareToken: string;
   items?: WishlistItemDto[];
-  /** Имя автора списка (для публичной страницы по ссылке) */
   ownerDisplayName?: string;
 }
 

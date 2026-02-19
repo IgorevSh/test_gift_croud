@@ -23,10 +23,15 @@ export default function Login() {
     setLoading(true);
     try {
       const { data } = await authApi.login(email, password);
-      dispatch(setAuth({ user: data.user, token: data.accessToken }));
+      dispatch(setAuth({ user: data.user }));
       navigate(redirect);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Неверный email или пароль');
+      const msg = err.response?.data?.message;
+      setError(
+        msg === 'INVALID_CREDENTIALS'
+          ? 'Неверный логин или пароль'
+          : msg || 'Неверный email или пароль',
+      );
     } finally {
       setLoading(false);
     }

@@ -6,9 +6,11 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
-  BadRequestException,
   UnauthorizedException,
+  Res,
 } from '@nestjs/common';
+import { AUTH_COOKIE_NAME } from './constants';
+import type { Response } from 'express';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ReqUser } from './decorators/user.decorator';
 import { User } from '../database/models/user.model';
@@ -40,6 +42,17 @@ class LoginDto {
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  private setAuthCookie(res: Response, accessToken: string) {
+    const isProd = process.env.NODE_ENV === 'production';
+    res.cookie(AUTH_COOKIE_NAME, accessToken, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   me(@ReqUser() user: User) {
@@ -47,19 +60,40 @@ export class AuthController {
   }
 
   @Post('register')
-  async register(@Body() dto: RegisterDto): Promise<AuthResult> {
-    return this.authService.register(
+  async register(
+    @Body() dto: RegisterDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthResult> {
+    const result = await this.authService.register(
       dto.email,
       dto.password,
       dto.displayName,
     );
+    this.setAuthCookie(res, result.accessToken);
+    return result;
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() dto: LoginDto): Promise<AuthResult> {
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthResult> {
     const user = await this.authService.validateUser(dto.email, dto.password);
     if (!user) throw new UnauthorizedException('INVALID_CREDENTIALS');
-    return this.authService.login(user);
+    const result = await this.authService.login(user);
+    this.setAuthCookie(res, result.accessToken);
+    return result;
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  async logout(@Res({ passthrough: true }) res: Response) {
+    res.clearCookie(AUTH_COOKIE_NAME, {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+    });
+    return { ok: true };
   }
 }

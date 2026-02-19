@@ -9,6 +9,7 @@ import './Auth.scss';
 export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,10 +22,14 @@ export default function Register() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (password !== confirmPassword) {
+      setError('Пароли не совпадают');
+      return;
+    }
     setLoading(true);
     try {
       const { data } = await authApi.register(email, password, displayName || undefined);
-      dispatch(setAuth({ user: data.user, token: data.accessToken }));
+      dispatch(setAuth({ user: data.user }));
       navigate(redirect);
     } catch (err: any) {
       const msg = err.response?.data?.message;
@@ -114,6 +119,17 @@ export default function Register() {
             placeholder="Пароль (минимум 6 символов)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={6}
+            autoComplete="new-password"
+            className="auth-input"
+          />
+          <input
+            type="password"
+            placeholder="Повторите пароль"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            onPaste={(e) => e.preventDefault()}
             required
             minLength={6}
             autoComplete="new-password"

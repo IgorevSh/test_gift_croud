@@ -47,17 +47,16 @@ export class DatabaseModule implements OnApplicationBootstrap {
     initReservationModel(seq);
     initContributionModel(seq);
 
-    // Associations
     User.hasMany(Wishlist, { foreignKey: 'ownerId', as: 'ownedWishlists' });
     Wishlist.belongsTo(User, { foreignKey: 'ownerId', as: 'owner' });
 
     Wishlist.hasMany(WishlistItem, { foreignKey: 'wishlistId', as: 'items' });
     WishlistItem.belongsTo(Wishlist, { foreignKey: 'wishlistId', as: 'wishlist' });
 
-    WishlistItem.hasOne(Reservation, { foreignKey: 'wishlistItemId', as: 'reservation' });
+    WishlistItem.hasMany(Reservation, { foreignKey: 'wishlistItemId', as: 'reservations' });
     Reservation.belongsTo(WishlistItem, { foreignKey: 'wishlistItemId', as: 'wishlistItem' });
     User.hasMany(Reservation, { foreignKey: 'userId' });
-    Reservation.belongsTo(User, { foreignKey: 'userId' });
+    Reservation.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
     WishlistItem.hasMany(Contribution, { foreignKey: 'wishlistItemId', as: 'contributions' });
     Contribution.belongsTo(WishlistItem, { foreignKey: 'wishlistItemId', as: 'wishlistItem' });

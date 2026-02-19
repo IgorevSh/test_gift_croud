@@ -242,7 +242,7 @@ export default function WishlistEdit() {
       )}
 
       <ul className="wishlist-edit__items">
-        {(current!.items || []).map((item: import('../api/wishlists').WishlistItemDto) => (
+        {(current!.items || []).map((item: WishlistItemDto) => (
           <ItemRow
             key={item.id}
             item={item}

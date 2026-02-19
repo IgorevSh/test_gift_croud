@@ -155,7 +155,6 @@
   color: #c0392b;
 }
 
-/* Skeleton when empty */
 .public-wishlist__skeleton {
   display: flex;
   flex-direction: column;
@@ -176,7 +175,6 @@
   50% { opacity: 0.85; }
 }
 
-/* Scrollable list: only scrolls when content overflows */
 .public-wishlist__list-scroll {
   flex: 1;
   min-height: 0;

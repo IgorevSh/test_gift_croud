@@ -15,7 +15,6 @@ export class EventsGateway {
   @WebSocketServer()
   server: Server;
 
-  /** Join room for a wishlist by share token to receive real-time updates */
   @SubscribeMessage('joinWishlist')
   handleJoinWishlist(
     @MessageBody() data: { shareToken: string },
@@ -26,8 +25,7 @@ export class EventsGateway {
     }
   }
 
-  /** Broadcast wishlist update to all viewers of this list (owner and guests). */
-  emitWishlistUpdate(shareToken: string, payload: { type: string; data?: any }) {
+  emitWishlistUpdate(shareToken: string, payload: { type: string; data?: unknown }) {
     this.server?.to(`wishlist:${shareToken}`).emit('wishlistUpdate', payload);
   }
 }

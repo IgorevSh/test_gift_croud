@@ -2,7 +2,8 @@ import { createSlice } from '@reduxjs/toolkit';
 
 type Theme = 'light' | 'dark';
 
-const stored: Theme = (localStorage.getItem('theme') as Theme) || 'light';
+const raw = localStorage.getItem('theme');
+const stored: Theme = raw === 'dark' || raw === 'light' ? raw : 'light';
 if (typeof document !== 'undefined') {
   document.documentElement.setAttribute('data-theme', stored);
 }
