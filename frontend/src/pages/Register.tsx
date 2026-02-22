@@ -14,7 +14,7 @@ export default function Register() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchParams] = useSearchParams();
-  const redirect = searchParams.get('redirect') || '/';
+  const redirect = searchParams.get('redirect') || '/wishlist';
   const theme = useAppSelector((s) => s.theme);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();

@@ -59,6 +59,31 @@
   opacity: 0.9;
 }
 
+.header__auth-link {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius);
+  transition: opacity var(--transition), color var(--transition);
+
+  &:hover {
+    color: var(--color-primary);
+  }
+
+  &--primary {
+    padding: 0.5rem 1rem;
+    background: var(--color-accent);
+    color: #fff;
+    font-weight: 600;
+
+    &:hover {
+      color: #fff;
+      opacity: 0.9;
+    }
+  }
+}
+
 .header__logout {
   padding: 0.5rem 1rem;
   border-radius: var(--radius);

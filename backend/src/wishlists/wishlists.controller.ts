@@ -29,8 +29,9 @@ class UpdateWishlistDto {
   title?: string;
 
   @IsOptional()
+  @ValidateIf((_o, v) => v != null)
   @IsString()
-  description?: string;
+  description?: string | null;
 }
 
 class AddItemDto {

@@ -34,7 +34,7 @@ export const createWishlist = createAsyncThunk(
 
 export const updateWishlist = createAsyncThunk(
   'wishlists/update',
-  ({ id, data }: { id: string; data: { title?: string; description?: string } }) =>
+  ({ id, data }: { id: string; data: { title?: string; description?: string | null } }) =>
     wishlistsApi.update(id, data).then((r) => r.data)
 );
 

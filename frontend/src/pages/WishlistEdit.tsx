@@ -12,6 +12,7 @@ import {
   clearError,
 } from '../store/slices/wishlistsSlice';
 import type { WishlistItemDto } from '../api/wishlists';
+import { formatAmountDisplay } from '../utils/amountInput';
 import './WishlistEdit.scss';
 
 const CURRENCIES: { value: 'RUB' | 'USD'; label: string }[] = [
@@ -89,6 +90,7 @@ export default function WishlistEdit() {
   const [newItemPrice, setNewItemPrice] = useState('');
   const [newItemCurrency, setNewItemCurrency] = useState<'RUB' | 'USD'>('RUB');
   const [copyDone, setCopyDone] = useState(false);
+  const [metaError, setMetaError] = useState('');
 
   useEffect(() => {
     if (id) dispatch(fetchWishlist(id));
@@ -123,7 +125,14 @@ export default function WishlistEdit() {
   const shareUrl = `${window.location.origin}/w/${current!.shareToken}`;
 
   const handleSaveMeta = () => {
-    dispatch(updateWishlist({ id: current!.id, data: { title: editTitle, description: editDesc || undefined } }));
+    const titleVal = editTitle.trim();
+    if (!titleVal) {
+      setEditTitle(current!.title);
+      setMetaError('Название не может быть пустым');
+      return;
+    }
+    setMetaError('');
+    dispatch(updateWishlist({ id: current!.id, data: { title: titleVal, description: editDesc.trim() || null } }));
   };
 
   const handleAddItem = async (e: React.FormEvent) => {
@@ -170,10 +179,21 @@ export default function WishlistEdit() {
         <input
           type="text"
           value={editTitle}
-          onChange={(e) => setEditTitle(e.target.value)}
+          onChange={(e) => {
+            setEditTitle(e.target.value);
+            if (metaError) setMetaError('');
+          }}
           onBlur={handleSaveMeta}
           className="wishlist-edit__title"
+          placeholder="Название списка"
+          aria-invalid={!!metaError}
+          aria-describedby={metaError ? 'wishlist-meta-error' : undefined}
         />
+        {metaError && (
+          <p id="wishlist-meta-error" className="wishlist-edit__meta-error" role="alert">
+            {metaError}
+          </p>
+        )}
         <textarea
           value={editDesc}
           onChange={(e) => setEditDesc(e.target.value)}
@@ -184,7 +204,7 @@ export default function WishlistEdit() {
         />
       </div>
 
-      <div className="wishlist-edit__share">
+      <div className="wishlist-edit__share app-card">
         <span className="wishlist-edit__share-label">Поделиться ссылкой:</span>
         <div className="wishlist-edit__share-row">
           <input type="text" readOnly value={shareUrl} className="wishlist-edit__share-input" />
@@ -218,12 +238,13 @@ export default function WishlistEdit() {
           className="wishlist-edit__add-input"
         />
         <input
-          type="text"
+          type="number"
+          min={0}
+          step="1"
           placeholder="Сумма"
           value={newItemPrice}
           onChange={(e) => setNewItemPrice(e.target.value)}
           className="wishlist-edit__add-input wishlist-edit__add-input--amount"
-          inputMode="decimal"
         />
         <CurrencySelect
           value={newItemCurrency}
@@ -323,7 +344,7 @@ function ItemRow({
   const currencySymbol = (c: string | null) => (c === 'USD' ? '$' : '₽');
 
   return (
-    <li className="item-row">
+    <li className="item-row app-card">
       {item.imageUrl && (
         <div className="item-row__img-wrap">
           <img src={item.imageUrl} alt="" className="item-row__img" />
@@ -342,7 +363,7 @@ function ItemRow({
               <div className="item-row__edit-row">
                 <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="Ссылка" className="item-row__input" />
                 <div className="item-row__price-edit">
-                  <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Сумма" className="item-row__input" />
+                  <input type="number" min={0} step="1" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Сумма" className="item-row__input" />
                   <CurrencySelect
                     value={currency}
                     onChange={setCurrency}
@@ -382,12 +403,12 @@ function ItemRow({
             )}
             {item.price && (
               <span className="item-row__price">
-                {item.price} {currencySymbol(item.currency)}
+                {formatAmountDisplay(item.price)} {currencySymbol(item.currency)}
               </span>
             )}
             {item.targetAmount && (
               <span className="item-row__target">
-                Сбор: {item.contributedTotal ?? 0} / {item.targetAmount} {currencySymbol(item.currency)}
+                Сбор: {formatAmountDisplay(item.contributedTotal ?? 0)} / {formatAmountDisplay(item.targetAmount)} {currencySymbol(item.currency)}
               </span>
             )}
           </>

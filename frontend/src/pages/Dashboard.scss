@@ -20,9 +20,8 @@
   padding: 0.65rem 0.85rem;
   border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: var(--radius);
-  background: var(--bg-card);
+  background: var(--bg-primary);
   color: var(--text-primary);
-  transition: border-color var(--transition);
 
   [data-theme='dark'] & {
     border-color: rgba(255, 255, 255, 0.2);
@@ -58,19 +57,39 @@
 }
 
 .dashboard__item {
-  border-radius: var(--radius);
-  background: var(--bg-card);
-  box-shadow: var(--shadow);
-  transition: background var(--transition), opacity var(--transition);
+  transition: opacity var(--transition);
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background:
+      radial-gradient(ellipse 100% 45% at 50% 0%, var(--card-gradient-top-hover) 0%, transparent 100%),
+      var(--bg-card-transparent-hover);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 1s ease-in-out;
+  }
+
+  &:hover::before {
+    opacity: 1;
+  }
+}
+
+.dashboard__item .dashboard__link:hover {
+  opacity: 1;
 }
 
 .dashboard__link {
+  position: relative;
+  z-index: 2;
   display: block;
-  padding: 1rem;
   color: var(--text-primary);
 }
 
 .dashboard__name {
+  font-size: 1.35rem;
   font-weight: 600;
   color: var(--color-primary);
 }

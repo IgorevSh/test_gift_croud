@@ -18,3 +18,15 @@
   padding-top: 1rem;
   overflow-y: auto;
 }
+
+.layout-main--full {
+  max-width: none;
+  width: 100%;
+  padding-left: 0;
+  padding-right: 0;
+  overflow-x: hidden;
+
+  &:has(.landing-page) {
+    overflow: visible;
+  }
+}

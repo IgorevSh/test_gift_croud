@@ -42,7 +42,7 @@ export const wishlistsApi = {
   getOne: (id: string) => api.get<WishlistDto>(`/wishlists/${id}`),
   create: (title: string, description?: string) =>
     api.post<WishlistDto>('/wishlists', { title, description }),
-  update: (id: string, data: { title?: string; description?: string }) =>
+  update: (id: string, data: { title?: string; description?: string | null }) =>
     api.put<WishlistDto>(`/wishlists/${id}`, data),
   delete: (id: string) => api.delete(`/wishlists/${id}`),
 

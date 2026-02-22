@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store';
 import { fetchPublicWishlist, setWishlist, clearPublicWishlist } from '../store/slices/publicWishlistSlice';
+import { deleteWishlist } from '../store/slices/wishlistsSlice';
 import { publicWishlistApi, wishlistsApi } from '../api/wishlists';
 import type { WishlistItemDto } from '../api/wishlists';
 import { io } from 'socket.io-client';
@@ -11,10 +12,12 @@ const SOCKET_URL = import.meta.env.VITE_API_URL || (typeof window !== 'undefined
 
 export default function PublicWishlist() {
   const { token } = useParams<{ token: string }>();
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { wishlist, found, isOwner, loading, error } = useAppSelector((s) => s.publicWishlist);
   const hasAuth = !!useAppSelector((s) => s.auth.token);
   const currentUserId = useAppSelector((s) => s.auth.user?.id) ?? null;
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!token || !hasAuth) return;
@@ -60,7 +63,14 @@ export default function PublicWishlist() {
   if (!token) return <div className="public-wishlist__error">Нет ссылки</div>;
   if (hasAuth && loading && !wishlist) return <div className="public-wishlist__loading">Загрузка...</div>;
   if (hasAuth && error) return <div className="public-wishlist__error">Ошибка загрузки</div>;
-  if (hasAuth && found === false && !loading) return <div className="public-wishlist__error">Список не найден</div>;
+  if (hasAuth && found === false && !loading) {
+    return (
+      <div className="public-wishlist__not-found">
+        <p className="public-wishlist__not-found-text">Ссылка не найдена</p>
+        <Link to="/" className="public-wishlist__not-found-btn">На главную</Link>
+      </div>
+    );
+  }
 
   const loginUrl = token ? `/login?redirect=${encodeURIComponent(`/w/${token}`)}` : '/login';
 
@@ -70,11 +80,6 @@ export default function PublicWishlist() {
         <Link to="/" className="public-wishlist__header-logo">
           Вишлист
         </Link>
-        {wishlist?.ownerDisplayName && (
-          <span className="public-wishlist__header-author">
-            Собирает: {wishlist.ownerDisplayName}
-          </span>
-        )}
       </header>
       {isGuest && (
         <div className="public-wishlist__overlay" aria-hidden>
@@ -89,12 +94,17 @@ export default function PublicWishlist() {
       )}
 
       <div className="public-wishlist__content">
-        <h1 className="public-wishlist__title">{wishlist?.title ?? '—'}</h1>
-        {wishlist?.description && (
-          <p className="public-wishlist__desc">{wishlist.description}</p>
-        )}
+        <section className="public-wishlist__hero">
+          <h1 className="public-wishlist__title">{wishlist?.title ?? '—'}</h1>
+          {wishlist?.ownerDisplayName && (
+            <p className="public-wishlist__hero-author">Собирает: {wishlist.ownerDisplayName}</p>
+          )}
+          {wishlist?.description && (
+            <p className="public-wishlist__desc">{wishlist.description}</p>
+          )}
+        </section>
 
-        {!showSkeletons && !isOwner && totalItems > 0 && (
+        {!showSkeletons && totalItems > 0 && (
           <div className="public-wishlist__overall-progress">
             <div className="public-wishlist__overall-progress-bar">
               <div
@@ -105,6 +115,28 @@ export default function PublicWishlist() {
             <span className="public-wishlist__overall-progress-text">
               Выполнено пунктов: {filledItems} из {totalItems}
             </span>
+          </div>
+        )}
+
+        {!showSkeletons && isOwner && totalItems > 0 && filledItems === totalItems && wishlist?.id && (
+          <div className="public-wishlist__complete-wrap">
+            <button
+              type="button"
+              className="public-wishlist__complete-btn"
+              disabled={deleting}
+              onClick={async () => {
+                if (!window.confirm('Завершить список желаний? Список будет удалён.')) return;
+                setDeleting(true);
+                try {
+                  await dispatch(deleteWishlist(wishlist.id)).unwrap();
+                  navigate('/wishlist');
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+            >
+              {deleting ? '...' : 'Завершить список желаний'}
+            </button>
           </div>
         )}
 
@@ -256,15 +288,24 @@ function PublicItemCard({
       )}
       <div className="public-card__body">
         <span className="public-card__title">{item.title}</span>
+        {isOwner && (() => {
+          const displayPrice = hasTarget && targetNum > 0 ? (item.targetAmount ?? item.price) : (item.price ?? item.targetAmount);
+          const priceStr = displayPrice != null && String(displayPrice).trim() !== '' ? String(displayPrice).trim() : null;
+          return priceStr != null ? (
+            <span className="public-card__price">{priceStr} {currencySym}</span>
+          ) : null;
+        })()}
         {item.link && (
           <a href={item.link} target="_blank" rel="noopener noreferrer" className="public-card__link">
+            <span className="public-card__link-icon" aria-hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+            </span>
             Ссылка на товар
           </a>
-        )}
-        {item.price != null && !hasTarget && (
-          <span className="public-card__price">
-            {item.price} {currencySym}
-          </span>
         )}
 
         {showProgressOrJoin && (
@@ -304,12 +345,16 @@ function PublicItemCard({
 
         {!hasTarget && isReserved && reservations.length > 0 && (
           <div className="public-card__participants">
-            <span className="public-card__participants-title">Участники:</span>
-            <ul className="public-card__participants-list">
-              {reservations.map((r) => (
-                <li key={r.id}>{r.displayName ?? 'Участник'}</li>
-              ))}
-            </ul>
+            <span className="public-card__participants-title">
+              {isOwner ? `Участников: ${reservations.length}` : 'Участники:'}
+            </span>
+            {!isOwner && (
+              <ul className="public-card__participants-list">
+                {reservations.map((r) => (
+                  <li key={r.id}>{r.displayName ?? 'Участник'}</li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 
@@ -389,11 +434,20 @@ function PublicItemCard({
                         </label>
                         <input
                           type="number"
-                          min="0"
-                          step="0.01"
+                          min={0}
+                          step="1"
                           placeholder="0"
                           value={contributeAmount}
                           onChange={(e) => setContributeAmount(e.target.value)}
+                          onBlur={() => {
+                            if (!hasTarget || !contributeAmount.trim()) return;
+                            const num = parseFloat(contributeAmount);
+                            if (Number.isNaN(num)) return;
+                            const maxRemaining = Math.max(0, targetNum - contributed);
+                            if (num > maxRemaining) {
+                              setContributeAmount(maxRemaining % 1 === 0 ? String(maxRemaining) : maxRemaining.toFixed(2));
+                            }
+                          }}
                           className="public-card__input"
                         />
                         <div className="public-card__my-contribution-actions">

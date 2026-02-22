@@ -145,9 +145,17 @@ export class WishlistsService {
     return plain as Wishlist;
   }
 
-  async update(id: string, ownerId: string, data: { title?: string; description?: string }): Promise<Wishlist> {
+  async update(id: string, ownerId: string, data: { title?: string; description?: string | null }): Promise<Wishlist> {
+    if (data.title !== undefined && typeof data.title === 'string' && !data.title.trim()) {
+      throw new BadRequestException('Название не может быть пустым');
+    }
     const w = await this.findOne(id, ownerId);
-    await w.update(data);
+    const payload = {
+      ...data,
+      ...(data.title !== undefined && { title: data.title.trim() }),
+      ...(data.description !== undefined && { description: data.description?.trim() || null }),
+    };
+    await w.update(payload);
     this.eventsGateway.emitWishlistUpdate(w.shareToken, { type: EVENT_WISHLIST });
     return w;
   }

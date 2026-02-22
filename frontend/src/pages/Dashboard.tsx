@@ -51,7 +51,7 @@ export default function Dashboard() {
       ) : (
         <ul className="dashboard__list">
           {list.map((w: WishlistDto) => (
-            <li key={w.id} className="dashboard__item">
+            <li key={w.id} className="dashboard__item app-card">
               <Link to={`/wishlist/${w.id}`} className="dashboard__link">
                 <span className="dashboard__name">{w.title}</span>
                 {w.description && (
