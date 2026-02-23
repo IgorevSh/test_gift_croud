@@ -1,0 +1,16 @@
+{
+  "name": "test-vibe",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "npm run build --prefix backend && npm run build --prefix frontend",
+    "build:backend": "npm run build --prefix backend",
+    "build:frontend": "npm run build --prefix frontend",
+    "run": "concurrently \"npm run start:dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "run:backend": "npm run start:dev --prefix backend",
+    "run:frontend": "npm run dev --prefix frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
